@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pediatric Contrast Calculator</title>
+    <!-- Tailwind CSS CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- React and ReactDOM CDNs -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX transformation in the browser (for simplicity in a single file) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        // Main App component
+        const App = () => {
+            const [weight, setWeight] = React.useState('');
+            const [unit, setUnit] = React.useState('kgs'); // 'kgs' or 'lbs'
+            const [mainBolus, setMainBolus] = React.useState('');
+            const [totalContrast, setTotalContrast] = React.useState('');
+            const [message, setMessage] = React.useState('');
+
+            // Function to handle weight input change
+            const handleWeightChange = (e) => {
+                const value = e.target.value;
+                // Allow only numbers and a single decimal point
+                if (/^\d*\.?\d*$/.test(value) || value === '') {
+                    setWeight(value);
+                }
+            };
+
+            // Function to handle unit change
+            const handleUnitChange = (e) => {
+                setUnit(e.target.value);
+            };
+
+            // Function to calculate contrast based on the new document
+            const calculateContrast = () => {
+                setMessage(''); // Clear previous messages
+                setMainBolus(''); // Clear previous results
+                setTotalContrast('');
+
+                const numericWeight = parseFloat(weight);
+
+                if (isNaN(numericWeight) || numericWeight <= 0) {
+                    setMessage('Please enter a valid positive weight.');
+                    return;
+                }
+
+                const weightInKgs = unit === 'lbs' ? (numericWeight / 2.20462) : numericWeight;
+                const roundedWeightKg = Math.round(weightInKgs);
+                const weightInLbs = weightInKgs * 2.20462;
+                const displayWeightKg = weightInKgs.toFixed(1);
+                const displayWeightLbs = weightInLbs.toFixed(1);
+
+                // 1st Calculation: Total volume to be delivered to patient (always using kg)
+                let calculatedTotalContrast = weightInKgs * 2.1;
+
+                let preprogrammedMicroBolus = 0;
+                let infoMessage = '';
+
+                // Determine preprogrammed micro bolus based on weight bins (in kgs)
+                if (roundedWeightKg >= 0 && roundedWeightKg <= 5) {
+                    preprogrammedMicroBolus = 3;
+                    infoMessage = `Weight bin: 0-5 kg (0-11 lb)`;
+                } else if (roundedWeightKg > 5 && roundedWeightKg <= 10) {
+                    preprogrammedMicroBolus = 8;
+                    infoMessage = `Weight bin: 6-10 kg (12-22 lb)`;
+                } else if (roundedWeightKg > 10 && roundedWeightKg <= 15) {
+                    preprogrammedMicroBolus = 13;
+                    infoMessage = `Weight bin: 11-15 kg (23-33 lb)`;
+                } else if (roundedWeightKg > 15 && roundedWeightKg <= 22) {
+                    preprogrammedMicroBolus = 18;
+                    infoMessage = `Weight bin: 16-22 kg (35-48 lb)`;
+                } else if (roundedWeightKg > 22 && roundedWeightKg <= 33) {
+                    preprogrammedMicroBolus = 30;
+                    infoMessage = `Weight bin: 23-33 kg (49-72 lb)`;
+                } else if (roundedWeightKg > 33 && roundedWeightKg <= 45) {
+                    preprogrammedMicroBolus = 42;
+                    infoMessage = `Weight bin: 34-45 kg (73-100 lb)`;
+                } else if (roundedWeightKg > 45 && roundedWeightKg <= 90) {
+                    preprogrammedMicroBolus = 52;
+                    infoMessage = `Weight bin: 46-90 kg (101-199 lb)`;
+                } else {
+                    // For weights outside the defined bins (e.g., > 90 kg)
+                    infoMessage = `Weight is outside the defined weight bins (0-90 kg / 0-199 lb). Please consult specific institutional guidelines. Entered weight ≈ ${displayWeightKg} kg (${displayWeightLbs} lb).`;
+                    setMainBolus('N/A');
+                    setTotalContrast('N/A');
+                    setMessage(infoMessage);
+                    return;
+                }
+
+                // 2nd Calculation: X amount (Upfront bolus) = Total volume - Preprogrammed micro bolus
+                const calculatedMainBolus = (calculatedTotalContrast - preprogrammedMicroBolus);
+
+                // Round to the nearest milliliter (no decimals)
+                const roundedTotalContrast = Math.round(Math.max(preprogrammedMicroBolus, calculatedTotalContrast));
+                const roundedMainBolus = Math.round(Math.max(0, calculatedMainBolus));
+
+                setMainBolus(roundedMainBolus.toString());
+                setTotalContrast(roundedTotalContrast.toString());
+                setMessage(`${infoMessage}. Total volume to be delivered: ${roundedTotalContrast} mL. Preprogrammed micro bolus: ${preprogrammedMicroBolus} mL.`);
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-200 p-4 sm:p-8 flex items-center justify-center font-sans">
+                    <div className="bg-white p-6 sm:p-10 rounded-xl shadow-2xl w-full max-w-lg">
+                        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-800 mb-2 text-center">
+                            Pediatric Contrast Calculator
+                        </h1>
+                        <p className="text-sm sm:text-base text-gray-600 text-center mb-6">
+                            This calculator is appropriate for pediatric Cardiovascular protocols using either an upfront 100% ICM bolus followed by a diluted bolus or a straight 100% ICM bolus. It is not intended for routine chest and abdomen/pelvis protocols.
+                        </p>
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-6 text-center">
+                            <p className="text-sm text-gray-700">
+                                <span className="font-semibold">Contrast dosage is 2.1 mL/kg of Iohexol (350 mg Iodine/mL).</span>
+                            </p>
+                        </div>
+
+                        {/* Weight Input */}
+                        <div className="mb-6">
+                            <label htmlFor="weight" className="block text-gray-700 text-lg font-semibold mb-2">
+                                Enter Weight:
+                            </label>
+                            <input
+                                type="text"
+                                id="weight"
+                                value={weight}
+                                onChange={handleWeightChange}
+                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg shadow-sm"
+                                placeholder="e.g., 15"
+                                aria-label="Enter patient weight"
+                            />
+                        </div>
+
+                        {/* Unit Selection */}
+                        <div className="mb-8">
+                            <label className="block text-gray-700 text-lg font-semibold mb-3">
+                                Select Unit:
+                            </label>
+                            <div className="flex space-x-6">
+                                <label className="inline-flex items-center text-lg cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        value="kgs"
+                                        checked={unit === 'kgs'}
+                                        onChange={handleUnitChange}
+                                        className="form-radio h-5 w-5 text-blue-600 focus:ring-blue-500"
+                                        aria-label="Select kilograms"
+                                    />
+                                    <span className="ml-2 text-gray-800">Kilograms (kgs)</span>
+                                </label>
+                                <label className="inline-flex items-center text-lg cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        value="lbs"
+                                        checked={unit === 'lbs'}
+                                        onChange={handleUnitChange}
+                                        className="form-radio h-5 w-5 text-blue-600 focus:ring-blue-500"
+                                        aria-label="Select pounds"
+                                    />
+                                    <span className="ml-2 text-gray-800">Pounds (lbs)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Calculate Button */}
+                        <button
+                            onClick={calculateContrast}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md text-xl mb-6"
+                            aria-label="Calculate contrast volume"
+                        >
+                            Calculate Contrast
+                        </button>
+
+                        {/* Results Display */}
+                        {message && (
+                            <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg text-base sm:text-lg mb-4 shadow-sm" role="alert">
+                                <p className="font-semibold mb-2">Result:</p>
+                                <p className="mb-1">
+                                    <span className="font-medium">Main Bolus Amount (Upfront Bolus):</span> {mainBolus} mL
+                                </p>
+                                <p className="mb-2">
+                                    <span className="font-medium">Total Contrast to be Delivered:</span> {totalContrast} mL
+                                </p>
+                                <p className="text-sm italic">{message}</p>
+                            </div>
+                        )}
+
+                        {/* Disclaimer (Important Note) */}
+                        <section aria-labelledby="important-note" className="mt-8">
+                            <div className="bg-white border border-gray-200 rounded-lg p-5 sm:p-6 shadow-sm">
+                            <h3 id="important-note" className="text-xl font-bold text-gray-900 mb-2">Important Note</h3>
+                            <p className="text-gray-700 mb-2">I recognize that use of this tool is for educational use only, and that any clinical decisions related to contrast administration must be approved by a licensed physician. This tool should not be used for clinical applications.</p>
+                            <p className="text-gray-700 mb-2">We provide this tool to help sites optimize their CT protocols under the direction and approval of a licensed physician. Results of this calculator are not guaranteed to be safe or appropriate for clinical use.</p>
+                            <p className="text-gray-700">By using or downloading this resource I have read and understand the text above.</p>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            );
+        };
+
+        // Render the App component into the root div
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
+    </script>
+</body>
+</html>
