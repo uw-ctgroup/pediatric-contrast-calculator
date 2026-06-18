@@ -1,0 +1,81 @@
+name: Static page check
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  check-index:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify self-contained page
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+
+          const html = fs.readFileSync("index.html", "utf8");
+          const checks = [
+            {
+              name: "external runtime script",
+              pattern: /<script\b[^>]*\bsrc=["']https?:\/\//i
+            },
+            {
+              name: "browser-side Babel",
+              pattern: /type=["']text\/babel["']|@babel\/standalone/i
+            },
+            {
+              name: "React runtime globals",
+              pattern: /\bReactDOM\b|\bReact\./
+            },
+            {
+              name: "Tailwind CDN",
+              pattern: /cdn\.tailwindcss\.com|unpkg\.com/i
+            }
+          ];
+
+          const failures = checks
+            .filter((check) => check.pattern.test(html))
+            .map((check) => check.name);
+
+          if (failures.length > 0) {
+            console.error(`index.html reintroduced: ${failures.join(", ")}`);
+            process.exit(1);
+          }
+
+          const requiredIds = [
+            "calculator-form",
+            "weight",
+            "result",
+            "main-bolus",
+            "total-contrast",
+            "result-message"
+          ];
+
+          const missingIds = requiredIds.filter((id) => !html.includes(`id="${id}"`));
+          if (missingIds.length > 0) {
+            console.error(`index.html is missing required element IDs: ${missingIds.join(", ")}`);
+            process.exit(1);
+          }
+
+          const inlineScripts = [...html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
+          if (inlineScripts.length === 0) {
+            console.error("index.html must contain the calculator JavaScript inline.");
+            process.exit(1);
+          }
+
+          for (const [index, match] of inlineScripts.entries()) {
+            try {
+              new Function(match[1]);
+            } catch (error) {
+              console.error(`Inline script ${index + 1} has a syntax error:`);
+              console.error(error);
+              process.exit(1);
+            }
+          }
+
+          console.log("index.html is self-contained and inline JavaScript parses.");
+          NODE
